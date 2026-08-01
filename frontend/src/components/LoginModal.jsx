@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Lock, Cpu, Key, AlertCircle, Server } from 'lucide-react';
 
 export default function LoginModal({ onLoginSuccess }) {
-  const [serverHost, setServerHost] = useState(localStorage.getItem('raspmonitor_server_host') || window.location.hostname || 'localhost');
+  const [serverHost, setServerHost] = useState(localStorage.getItem('raspmonitor_server_host') || '');
+  const [serverPort, setServerPort] = useState(localStorage.getItem('raspmonitor_server_port') || '8000');
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,8 +15,9 @@ export default function LoginModal({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      const cleanHost = serverHost.trim();
-      const apiUrl = `http://${cleanHost}:8000/api/login`;
+      const cleanHost = serverHost.trim().replace(/^https?:\/\//, '');
+      const cleanPort = serverPort.trim() || '8000';
+      const apiUrl = `http://${cleanHost}:${cleanPort}/api/login`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -28,12 +30,13 @@ export default function LoginModal({ onLoginSuccess }) {
       if (response.ok && data.access_token) {
         localStorage.setItem('raspmonitor_token', data.access_token);
         localStorage.setItem('raspmonitor_server_host', cleanHost);
-        onLoginSuccess(data.access_token, cleanHost);
+        localStorage.setItem('raspmonitor_server_port', cleanPort);
+        onLoginSuccess(data.access_token, cleanHost, cleanPort);
       } else {
         setError(data.detail || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
       }
     } catch (err) {
-      setError(`ไม่สามารถเชื่อมต่อกับ Raspberry Pi Backend ที่ http://${serverHost}:8000 ได้ (กรุณาตรวจสอบว่า Backend บน Raspberry Pi เปิดอยู่และใส่ IP ถูกต้อง)`);
+      setError(`ไม่สามารถเชื่อมต่อกับ Raspberry Pi ที่ http://${serverHost}:${serverPort} ได้ (กรุณาตรวจสอบ IP, Port และสถานะ Backend บน Raspberry Pi)`);
     } finally {
       setLoading(false);
     }
@@ -62,22 +65,37 @@ export default function LoginModal({ onLoginSuccess }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Raspberry Pi Host / IP Address
-            </label>
-            <div className="relative">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Raspberry Pi IP / Host
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={serverHost}
+                  onChange={(e) => setServerHost(e.target.value)}
+                  className="w-full glass-input pl-10 mono text-sm"
+                  placeholder="เช่น 192.168.1.50"
+                  required
+                />
+                <Server className="w-4 h-4 text-cyan-400 absolute left-3 top-3.5" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Port
+              </label>
               <input
                 type="text"
-                value={serverHost}
-                onChange={(e) => setServerHost(e.target.value)}
-                className="w-full glass-input pl-10 mono text-sm"
-                placeholder="เช่น 192.168.1.50 หรือ localhost"
+                value={serverPort}
+                onChange={(e) => setServerPort(e.target.value)}
+                className="w-full glass-input mono text-sm text-center"
+                placeholder="8000"
                 required
               />
-              <Server className="w-4 h-4 text-cyan-400 absolute left-3 top-3.5" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">ใส่ IP ของ Raspberry Pi 4 หรือใส่ localhost ถ้ารันบนเครื่องเดียวกัน</p>
           </div>
 
           <div>
@@ -124,7 +142,7 @@ export default function LoginModal({ onLoginSuccess }) {
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          Raspberry Pi 4 System Monitor &bull; Configurable Host Connection
+          Raspberry Pi 4 System Monitor &bull; Configurable Host & Port
         </div>
       </div>
     </div>

@@ -10,13 +10,13 @@ import LoginModal from './components/LoginModal';
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('raspmonitor_token') || '');
   const [serverHost, setServerHost] = useState(localStorage.getItem('raspmonitor_server_host') || '');
+  const [serverPort, setServerPort] = useState(localStorage.getItem('raspmonitor_server_port') || '8000');
   const [metrics, setMetrics] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connErrorCount, setConnErrorCount] = useState(0);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
 
-  // If no host is saved yet, clear token to force LoginModal to ask for Host IP
   useEffect(() => {
     if (!localStorage.getItem('raspmonitor_server_host')) {
       handleLogout();
@@ -28,15 +28,16 @@ export default function App() {
 
     const connectWebSocket = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const cleanHost = serverHost.trim();
-      const wsUrl = `${protocol}://${cleanHost}:8000/ws/metrics?token=${token}`;
+      const cleanHost = serverHost.trim().replace(/^https?:\/\//, '');
+      const cleanPort = serverPort.trim() || '8000';
+      const wsUrl = `${protocol}://${cleanHost}:${cleanPort}/ws/metrics?token=${token}`;
 
       console.log('Connecting to WebSocket:', wsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket Connected successfully to:', cleanHost);
+        console.log('WebSocket Connected successfully to:', `${cleanHost}:${cleanPort}`);
         setIsConnected(true);
         setConnErrorCount(0);
       };
@@ -51,7 +52,7 @@ export default function App() {
       };
 
       ws.onerror = (err) => {
-        console.error('WebSocket Error connecting to host:', cleanHost, err);
+        console.error('WebSocket Error connecting to:', `${cleanHost}:${cleanPort}`, err);
         setConnErrorCount((prev) => prev + 1);
       };
 
@@ -82,13 +83,15 @@ export default function App() {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [token, serverHost]);
+  }, [token, serverHost, serverPort]);
 
   const handleLogout = () => {
     localStorage.removeItem('raspmonitor_token');
     localStorage.removeItem('raspmonitor_server_host');
+    localStorage.removeItem('raspmonitor_server_port');
     setToken('');
     setServerHost('');
+    setServerPort('8000');
     setMetrics(null);
     setIsConnected(false);
     if (wsRef.current) {
@@ -96,27 +99,27 @@ export default function App() {
     }
   };
 
-  const handleLoginSuccess = (newToken, newHost) => {
+  const handleLoginSuccess = (newToken, newHost, newPort) => {
     setServerHost(newHost);
+    setServerPort(newPort || '8000');
     setToken(newToken);
   };
 
-  // If no token or no server host configured, show Login & Server IP Modal
   if (!token || !serverHost) {
     return <LoginModal onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-7xl mx-auto">
-      {/* Connection Warning Banner if host is unreachable */}
+      {/* Connection Warning Banner */}
       {connErrorCount > 2 && (
         <div className="mb-4 p-3 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between">
-          <span>ไม่สามารถเชื่อมต่อกับ Raspberry Pi ที่ <strong>{serverHost}:8000</strong> ได้ กรุณาตรวจสอบ IP หรือเลือกเปลี่ยนเซิร์ฟเวอร์</span>
+          <span>ไม่สามารถเชื่อมต่อกับ Raspberry Pi ที่ <strong>{serverHost}:{serverPort}</strong> ได้ กรุณาตรวจสอบ IP, Port หรือเลือกเปลี่ยนเซิร์ฟเวอร์</span>
           <button
             onClick={handleLogout}
             className="px-3 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold transition"
           >
-            เปลี่ยน IP เซิร์ฟเวอร์
+            เปลี่ยน IP / Port
           </button>
         </div>
       )}
@@ -144,9 +147,9 @@ export default function App() {
 
       {/* Footer Info */}
       <footer className="mt-8 text-center text-xs text-slate-500 border-t border-white/5 pt-4 flex items-center justify-center gap-4">
-        <span>RaspMonitor &bull; Connected to: <strong>{serverHost}:8000</strong></span>
+        <span>RaspMonitor &bull; Connected to: <strong>{serverHost}:{serverPort}</strong></span>
         <button onClick={handleLogout} className="text-cyan-400 hover:underline">
-          (เปลี่ยน IP)
+          (เปลี่ยน IP / Port)
         </button>
       </footer>
     </div>
