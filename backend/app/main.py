@@ -9,7 +9,6 @@ from app.websocket_manager import manager
 
 app = FastAPI(title="RaspMonitor API", version="1.0.0")
 
-# Enable CORS for Vite frontend (localhost:5173 / any host)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,6 +36,7 @@ async def get_status():
     metrics = collect_system_metrics()
     return {
         "status": "online",
+        "version": "1.0.0",
         "hostname": metrics["system"]["hostname"],
         "os": metrics["system"]["os"],
         "uptime_seconds": metrics["system"]["uptime_seconds"]
@@ -57,7 +57,6 @@ async def websocket_metrics(websocket: WebSocket, token: str = Query(...)):
     await manager.connect(websocket)
     try:
         while True:
-            # Stream metrics every 1.0 second
             data = collect_system_metrics()
             await websocket.send_json(data)
             await asyncio.sleep(1.0)
